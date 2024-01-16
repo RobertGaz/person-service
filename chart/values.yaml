@@ -1,0 +1,13 @@
+namespace_name: people
+
+aws:
+  region: eu-central-1
+  access_key_id: TO_BE_REPLACED
+  secret_access_key: TO_BE_REPLACED
+
+registry_credentials_json: TO_BE_REPLACED
+
+spring_profile: dev-env
+
+db:
+  password: TO_BE_REPLACED

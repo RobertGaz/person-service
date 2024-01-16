@@ -1,0 +1,32 @@
+stages:
+  - app build
+  - image build
+
+
+gradle-build-job:
+  image: gradle:8.5.0-jdk17-alpine
+  stage: app build
+  script:
+    - echo "Building the sources..."
+    - gradle clean build
+    - echo "Build complete."
+  artifacts:
+    paths:
+      - build/libs/*.jar
+
+docker-build-job:
+  stage: image build
+  image: docker:20.10.16
+  services:
+    - name: docker:20.10.16-dind
+      alias: docker
+  script:
+    - echo "Logging in..."
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "Building the image..."
+    - docker build -t registry.gitlab.com/robertgaz/person-service:$CI_COMMIT_BRANCH .
+    - echo "Build complete."
+    - echo "Pushing the image..."
+    - docker push registry.gitlab.com/robertgaz/person-service:$CI_COMMIT_BRANCH
+    - echo "Push complete."
+

@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: person-service-configmap
+  namespace: people
+data:
+  db_url: person-db-service:3306
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: person-service-secret
+  namespace: people
+type: Opaque
+data:
+  db_username: cm9vdA==
+  db_password: bXktc2VjcmV0LXB3
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: person-service-deployment
+  namespace: people
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: person-service
+  template:
+    metadata:
+      labels:
+        app: person-service
+    spec:
+      containers:
+        - name: person-service-container
+#          image: robertgaz/person-service:latest
+          image: registry.gitlab.com/robertgaz/person-service:main
+          imagePullPolicy: Always
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: dev-env
+            - name: DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: person-service-configmap
+                  key: db_url
+            - name: AWS_ACCESS_KEY_ID
+              value: TO_BE_REPLACED
+            - name: AWS_SECRET_ACCESS_KEY
+              value: TO_BE_REPLACED
+            - name: AWS_REGION
+              value: eu-central-1
+          ports:
+            - containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            failureThreshold: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
+      imagePullSecrets:
+        - name: registry-credentials
+
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: person-service
+  namespace: people
+spec:
+  selector:
+    app: person-service
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 31001

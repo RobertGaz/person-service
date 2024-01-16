@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace_name }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: person-db-configmap
+  namespace: {{ .Values.namespace_name }}
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS people;
+    USE people;
+    CREATE TABLE IF NOT EXISTS person (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      first_name VARCHAR(30),
+      last_name VARCHAR(30),
+      birth_date DATE,
+      email VARCHAR(30),
+      country VARCHAR(30)
+    );
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: person-db-secret
+  namespace: {{ .Values.namespace_name }}
+type: Opaque
+data:
+  db_password: {{ .Values.db.password | b64enc }}
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: person-db-statefulset
+  namespace: {{ .Values.namespace_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: person-db
+  template:
+    metadata:
+      labels:
+        app: person-db
+    spec:
+      containers:
+        - name: person-db-container
+          image: mariadb
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: person-db-secret
+                  key: db_password
+          volumeMounts:
+            - name: person-db-data
+              mountPath: /var/lib/mysql
+            - name: person-db-init-scripts
+              mountPath: /docker-entrypoint-initdb.d/
+      volumes:
+        - name: person-db-init-scripts
+          configMap:
+            name: person-db-configmap
+  volumeClaimTemplates:
+    - metadata:
+        name: person-db-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 200Mi
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: person-db-service
+  namespace: {{ .Values.namespace_name }}
+spec:
+  selector:
+    app: person-db
+  ports:
+    - port: 3306
+      targetPort: 3306
+      protocol: TCP
+  clusterIP: None
